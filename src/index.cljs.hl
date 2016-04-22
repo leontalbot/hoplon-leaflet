@@ -1,0 +1,15 @@
+(page "index.html"
+      (:require [cljsjs.leaflet]))
+
+(with-init!
+  (let [map (.setView (.map js/L "map") #js [51.505 -0.09] 13)]
+    (.addTo (.tileLayer js/L "http://{s}.tile.osm.org/{z}/{x}/{y}.png"
+                        (clj->js {:attribution "with Hoplon"
+                                  :maxZoom 18}))
+            map)))
+(html
+  (head
+    (link :href "app.css" :rel "stylesheet"))
+  (body
+   (h1 "Hello, Hoplon!")
+   (div :id "map")))
