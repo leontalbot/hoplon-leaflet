@@ -20,12 +20,14 @@
   "Build hoplon-leaflet for local development."
   []
   (comp
+    (sift :add-jar {'cljsjs/leaflet #"\.css$"})
     (watch)
     (speak)
     (hoplon)
     (reload)
     (cljs)
-    (serve :port 8000)))
+    (serve :port 8000)
+    (target)))
 
 (deftask prod
   "Build hoplon-leaflet for production deployment."

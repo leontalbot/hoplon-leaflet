@@ -1,15 +1,27 @@
 (page "index.html"
       (:require [cljsjs.leaflet]))
 
-(with-init!
-  (let [map (.setView (.map js/L "map") #js [51.505 -0.09] 13)]
-    (.addTo (.tileLayer js/L "http://{s}.tile.osm.org/{z}/{x}/{y}.png"
-                        (clj->js {:attribution "with Hoplon"
-                                  :maxZoom 18}))
-            map)))
+(defelem leaflet-map
+  [{:keys [center] :as attr} _]
+  (let [id   (str (gensym))
+        attr (dissoc attr :center)]
+    (with-let [$e (div attr)]
+      (with-timeout 0
+        (let [m (.map js/L $e)]
+          (do-watch center #(.setView m (clj->js %2) 13))
+          (-> (.tileLayer js/L "http://{s}.tile.osm.org/{z}/{x}/{y}.png"
+                          (clj->js {:attribution "with Hoplon" :maxZoom 18}))
+              (.addTo m)))))))
+
+(defc map-center [51.505 -0.09])
+
+(with-interval 1000
+  (swap! map-center update-in [0] + 0.001))
+
 (html
   (head
+    (link :href "cljsjs/common/leaflet.inc.css" :rel "stylesheet")
     (link :href "app.css" :rel "stylesheet"))
   (body
    (h1 "Hello, Hoplon!")
-   (div :id "map")))
+   (leaflet-map :css {:height "800px"} :center map-center)))
