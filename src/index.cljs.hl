@@ -3,8 +3,7 @@
 
 (defelem leaflet-map
   [{:keys [center] :as attr} _]
-  (let [id   (str (gensym))
-        attr (dissoc attr :center)]
+  (let [attr (dissoc attr :center)]
     (with-let [$e (div attr)]
       (with-timeout 0
         (let [m (.map js/L $e)]
