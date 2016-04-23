@@ -20,7 +20,7 @@
   "Build hoplon-leaflet for local development."
   []
   (comp
-    (sift :add-jar {'cljsjs/leaflet #"\.css$"})
+   (sift :add-jar {'cljsjs/leaflet #"\.css$"})
     (watch)
     (speak)
     (hoplon)

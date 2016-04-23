@@ -1,26 +1,130 @@
 (page "index.html"
       (:require [cljsjs.leaflet]))
 
+
+;;DATA
+
+(def tiles
+  {:standard  "http://{s}.tile.osm.org/{z}/{x}/{y}.png"
+   :bw-mapnik "http://{s}.www.toolserver.org/tiles/bw-mapnik/{z}/{x}/{y}.png"
+   :map-surfer-greyscale "http://korona.geog.uni-heidelberg.de/tiles/roadsg/x={x}&y={y}&z={z}"})
+
+(def markers
+  [{:title "Company ABC"
+    :address "1234, street street"
+    :url "http://www.compagnyABC.com"
+    :icon-url "https://cdn0.iconfinder.com/data/icons/weboo-2/512/pin.png"
+    :tel "418-555-1234"
+    :lat "46.8135131"
+    :lng "-71.2267981"}
+   {:title "Company DEF"
+    :address "5678, street street"
+    :url "http://www.compagnyDEF.com"
+    :icon-url "https://www.votepour.ca/assets/images/dot-blue.png"
+    :tel "418-555-5678"
+    :lat "46.8117099"
+    :lng "-71.2345251"}])
+
+;; VIEWS
+
+(defn str-div  [& body] (str "<div>" (apply str body) "</div>"))
+(defn str-h1   [& body] (str "<h1>" (apply str body) "</h1>"))
+(defn str-p    [& body] (str "<p>" (apply str body) "</p>"))
+(defn str-span [& body] (str "<span>" (apply str body) "</span>"))
+(defn str-a    [href body] (str "<a href='" href "' target='_blank'>" body "</a>"))
+
+(defn popup-template [{:keys [title title-url lines]}]
+  (str-div (str-h1 (str-a title-url title))
+          (apply str-div (map str-p lines))))
+
+(def attribution
+  (str-span "Made with <3 with "
+           (str-a "http://leafletjs.com" "Leaflet")
+           " and "
+           (str-a "http://hoplon.io" "Hoplon")))
+
+
 (defelem leaflet-map
-  [{:keys [center] :as attr} _]
-  (let [attr (dissoc attr :center)]
+  [{:keys [tile center dragging scroll-wheel-zoom touch-zoom double-click-zoom
+           attribution data-markers auto-scrolling] :as attr} _]
+  (let [attr (dissoc attr :tile :center :dragging :scroll-wheel-zoom :touch-zoom
+                     :double-click-zoom :attribution :data-markers :auto-scrolling)]
     (with-let [$e (div attr)]
       (with-timeout 0
-        (let [m (.map js/L $e)]
-          (do-watch center #(.setView m (clj->js %2) 13))
-          (-> (.tileLayer js/L "http://{s}.tile.osm.org/{z}/{x}/{y}.png"
-                          (clj->js {:attribution "with Hoplon" :maxZoom 18}))
-              (.addTo m)))))))
+        (let [m (.map js/L $e)
+              t (.tileLayer
+                 js/L
+                 tile
+                 (clj->js {:maxZoom 18
+                           :attributionControl false}))
+              I (-> js/L
+                    .-Icon
+                    (.extend (clj->js {:options (clj->js {:iconSize (clj->js [35 35])
+                                                          :iconAnchor (clj->js [18 18]) ; point of the icon which will correspond to marker's location
+                                                          :popupAnchor (clj->js [0 0]) ; point from which the popup should open relative to the iconAnchor
+                                                          })})))]
 
-(defc map-center [51.505 -0.09])
+          (.addTo t m)
+          (-> m .-attributionControl (.setPrefix attribution))
+
+          ;;Disable drag and zoom handlers
+          (when (false? dragging) (.disable (.-dragging m)))
+          (when (false? scroll-wheel-zoom) (.disable (.-scrollWheelZoom m)))
+          (when (false? touch-zoom) (.disable (.-touchZoom m)))
+          (when (false? double-click-zoom) (.disable (.-doubleClickZoom m)))
+
+
+          ;;Events handling
+          (.on m "dragend" (fn [e] (.redraw t))) ;hoplon fix
+          (if auto-scrolling
+            (do-watch center #(.setView m (clj->js %2) 13))
+            (.setView m (clj->js @center) 13))
+
+          ;;Add markers
+          (doseq [data-marker data-markers]
+            (let [icon (I. (clj->js {:iconUrl (:icon-url data-marker)}))
+                          marker (.marker js/L
+                                  (clj->js [(float (:lat data-marker))
+                                            (float (:lng data-marker))])
+                                  (clj->js {:icon icon}))]
+                      (-> (.bindPopup marker
+                                      (popup-template
+                                       {:title (:title data-marker)
+                                        :title-url (:url data-marker)
+                                        :lines (map data-marker [:address :tel])}))
+                  (.addTo m)))))))))
+
+(defc map-center [46.8221225 -71.229526])
 
 (with-interval 1000
   (swap! map-center update-in [0] + 0.001))
 
+(def maps
+  {:main (leaflet-map :css {:height "600px"}
+                      :tile (:bw-mapnik tiles)
+                      :center map-center
+                      :auto-scrolling false
+                      :dragging true
+                      :scroll-wheel-zoom false
+                      :attribution attribution
+                      :data-markers markers)
+   :auto-scrolling (leaflet-map :css {:height "600px"}
+                                :tile (:bw-mapnik tiles)
+                                :center map-center
+                                :auto-scrolling true
+                                :dragging false
+                                :scroll-wheel-zoom false
+                                :attribution attribution
+                                :data-markers markers)})
+
 (html
   (head
-    (link :href "cljsjs/common/leaflet.inc.css" :rel "stylesheet")
-    (link :href "app.css" :rel "stylesheet"))
+   (link :href "cljsjs/common/leaflet.inc.css" :rel "stylesheet")
+   (link :href "app.css" :rel "stylesheet"))
   (body
-   (h1 "Hello, Hoplon!")
-   (leaflet-map :css {:height "800px"} :center map-center)))
+   (header (h1 "Hoplon Leaflet")
+           (nav (ul (li (a :href "#main"
+                           "Main"))
+                    (li (a :href "#auto-scrolling" "Auto-scrolling")))))
+   (div :id "main" (:main maps))
+   (div :id "auto-scrolling" (:auto-scrolling maps))))
